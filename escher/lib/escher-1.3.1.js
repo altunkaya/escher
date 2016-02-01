@@ -11582,6 +11582,8 @@ define('Map',['utils', 'Draw', 'Behavior', 'Scale', 'build', 'UndoStack', 'Callb
         highlight_node: highlight_node,
         highlight_text_label: highlight_text_label,
         highlight: highlight,
+        // full screen
+        full_screen: full_screen,
         // io
         save: save,
         map_for_export: map_for_export,
@@ -13420,6 +13422,41 @@ define('Map',['utils', 'Draw', 'Behavior', 'Scale', 'build', 'UndoStack', 'Callb
         if (sel !== null) {
             sel.classed('highlight', true);
         }
+    }
+
+    // -------------------------------------------------------------------------
+    // Full screen
+
+    function full_screen() {
+        //First, request the fullscreen,
+        // then after it becomes fullscreen, click on the zoom_to_extend button by index (i == 2)
+
+        var builder = d3.select('.escher-container').datum();
+        var container = builder.selection[0][0];
+        var cont = $(container).attr('id');
+        var elem = document.getElementById(cont);
+
+        if (elem.requestFullscreen) {
+            elem.requestFullscreen();
+            document.addEventListener("fullscreenchange", function () {
+                d3.selectAll(".simple-button").filter(function (d, i) {if (i == 2) this.click();});}, false);
+        } else if (elem.msRequestFullscreen) {
+            elem.msRequestFullscreen();
+            document.addEventListener("MSFullscreenChange", function () {
+                d3.selectAll(".simple-button").filter(function (d, i) {if (i == 2) this.click();});}, false);
+        } else if (elem.mozRequestFullScreen) {
+            elem.mozRequestFullScreen();
+            document.addEventListener("mozfullscreenchange", function () {
+                d3.selectAll(".simple-button").filter(function (d, i) {if (i == 2) this.click();});}, false);
+        } else if (elem.webkitRequestFullscreen) {
+            elem.webkitRequestFullscreen();
+            document.addEventListener("webkitfullscreenchange", function () {
+                d3.selectAll(".simple-button").filter(function (d, i) {if (i == 2) this.click();});}, false);
+        } else {
+            console.error("full screen does not seem to be supported on this system.");
+        }
+
+        return null;
     }
 
     // -------------------------------------------------------------------------
@@ -15442,6 +15479,7 @@ define('Builder',['utils', 'BuildInput', 'ZoomContainer', 'Map', 'CobraModel', '
             enable_search: true,
             fill_screen: false,
             zoom_to_element: null,
+            full_screen_button: false,
             // map, model, and styles
             starting_reaction: null,
             never_ask_before_quit: false,
@@ -15700,7 +15738,8 @@ define('Builder',['utils', 'BuildInput', 'ZoomContainer', 'Map', 'CobraModel', '
         // set up key manager
         var keys = this._get_keys(this.map, this.zoom_container,
                                   this.search_bar, this.settings_bar,
-                                  this.options.enable_editing);
+                                  this.options.enable_editing,
+                                  this.options.full_screen_button);
         this.map.key_manager.assigned_keys = keys;
         // tell the key manager about the reaction input and search bar
         this.map.key_manager.input_list = [this.build_input, this.search_bar,
@@ -15713,9 +15752,9 @@ define('Builder',['utils', 'BuildInput', 'ZoomContainer', 'Map', 'CobraModel', '
         // set up menu and status bars
         if (this.options.menu=='all') {
             this._setup_menu(menu_div, button_div, this.map, this.zoom_container, this.map.key_manager, keys,
-                             this.options.enable_editing, this.options.enable_keys);
+                             this.options.enable_editing, this.options.enable_keys, this.options.full_screen_button);
         } else if (this.options.menu=='zoom') {
-            this._setup_simple_zoom_buttons(button_div, keys);
+            this._setup_simple_zoom_buttons(button_div, keys, this.options.full_screen_button);
         }
 
         // setup selection box
@@ -16010,7 +16049,7 @@ define('Builder',['utils', 'BuildInput', 'ZoomContainer', 'Map', 'CobraModel', '
     }
 
     function _setup_menu(menu_selection, button_selection, map, zoom_container,
-                         key_manager, keys, enable_editing, enable_keys) {
+                         key_manager, keys, enable_editing, enable_keys, full_screen_button) {
         var menu = menu_selection.attr('id', 'menu')
                 .append('ul')
                 .attr('class', 'nav nav-pills');
@@ -16197,6 +16236,11 @@ define('Builder',['utils', 'BuildInput', 'ZoomContainer', 'Map', 'CobraModel', '
                 .button({ key: keys.search,
                           text: 'Find',
                           key_text: (enable_keys ? ' (Ctrl+F)' : null) });
+        if (full_screen_button){
+            view_menu.button({key: keys.full_screen,
+                text: 'Full screen',
+                key_text: (enable_keys ? ' (Ctrl+2)' : null)});
+        }
         if (enable_editing) {
             view_menu.button({ key: keys.toggle_beziers,
                                id: 'bezier-button',
@@ -16245,7 +16289,15 @@ define('Builder',['utils', 'BuildInput', 'ZoomContainer', 'Map', 'CobraModel', '
                                classes: 'btn btn-default',
                                tooltip: 'Zoom to canvas',
                                key_text: (enable_keys ? ' (Ctrl+1)' : null) });
-
+        if (full_screen_button) {
+            ui.individual_button(button_panel.append('li'),
+                {   key: keys.full_screen,
+                    icon: 'glyphicon glyphicon-fullscreen',
+                    classes: 'btn btn-default',
+                    tooltip: 'Full screen',
+                    key_text: (enable_keys ? ' (Ctrl+2)' : null)
+                });
+        }
         // mode buttons
         if (enable_editing) {
             ui.radio_button_group(button_panel.append('li'))
@@ -16410,7 +16462,7 @@ define('Builder',['utils', 'BuildInput', 'ZoomContainer', 'Map', 'CobraModel', '
         }
     }
 
-    function _setup_simple_zoom_buttons(button_selection, keys) {
+    function _setup_simple_zoom_buttons(button_selection, keys, full_screen_button) {
         var button_panel = button_selection.append('div')
                 .attr('id', 'simple-button-panel');
 
@@ -16430,7 +16482,15 @@ define('Builder',['utils', 'BuildInput', 'ZoomContainer', 'Map', 'CobraModel', '
                                text: '↔',
                                classes: 'simple-button',
                                tooltip: 'Zoom to canvas (Ctrl 1)' });
-
+        if (full_screen_button) {
+            ui.individual_button(button_panel.append('div'),
+                {
+                    key: keys.full_screen,
+                    icon: 'glyphicon glyphicon-fullscreen',
+                    classes: 'simple-button',
+                    tooltip: 'Full screen (Ctrl 2)'
+                });
+        }
     }
 
     function _toggle_direction_buttons(on_off) {
@@ -16499,7 +16559,7 @@ define('Builder',['utils', 'BuildInput', 'ZoomContainer', 'Map', 'CobraModel', '
         });
     }
 
-    function _get_keys(map, zoom_container, search_bar, settings_bar, enable_editing) {
+    function _get_keys(map, zoom_container, search_bar, settings_bar, enable_editing, full_screen_button) {
         var keys = {
             save: { key: 83, modifiers: { control: true }, // ctrl-s
                     target: map,
@@ -16543,6 +16603,12 @@ define('Builder',['utils', 'BuildInput', 'ZoomContainer', 'Map', 'CobraModel', '
             show_settings: { key: 188, modifiers: { control: true }, // Ctrl ,
                              fn: settings_bar.toggle.bind(settings_bar) }
         };
+        if (full_screen_button){
+            utils.extend(keys, {
+                    full_screen: { key: 50, modifiers: { control: true }, // ctrl-2
+                                   target: map,
+                                   fn: map.full_screen }});
+        }
         if (enable_editing) {
             utils.extend(keys, {
                 build_mode: { key: 78, // n
